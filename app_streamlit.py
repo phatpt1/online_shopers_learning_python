@@ -315,14 +315,20 @@ elif menu == "📊 4. Phân tích Dữ liệu (EDA)":
         # --- 2. Phân phối Target ---
         st.subheader("2. Phân phối Nhãn Mục tiêu (Class Imbalance)")
         with st.container(border=True):
-            rev_counts = df['Revenue'].value_counts().rename({False: 'Không Mua (False)', True: 'Có Mua (True)'})
+            # SỬA LỖI PANDAS: Ghép chung vào bảng trước, sau đó mới đổi tên index
+            rev_counts = df['Revenue'].value_counts()
             rev_pct = df['Revenue'].value_counts(normalize=True) * 100
+            
+            df_rev = pd.DataFrame({'Số lượng': rev_counts, 'Tỷ lệ (%)': rev_pct}).round(2)
+            
+            # Khắc phục lỗi TypeError bằng cách gán index sau khi đã tạo DataFrame
+            df_rev.index = ['Không Mua (False)', 'Có Mua (True)'] 
             
             col_chart, col_table = st.columns([2, 1], gap="large")
             with col_chart:
-                st.bar_chart(rev_counts, color="#ff4b4b")
+                # Vẽ biểu đồ dựa trên số lượng gốc để tránh lỗi
+                st.bar_chart(df['Revenue'].value_counts(), color="#ff4b4b")
             with col_table:
-                df_rev = pd.DataFrame({'Số lượng': rev_counts, 'Tỷ lệ (%)': rev_pct}).round(2)
                 st.dataframe(df_rev)
             
             st.error("🚨 **Nhận xét cốt lõi:** Dữ liệu bị lệch cực kỳ nghiêm trọng (Tỷ lệ Không mua lên đến ~84.5%). Thuật toán bắt buộc phải dùng tham số phạt `class_weight='balanced'` và theo dõi bằng `PR-AUC` thay vì Accuracy (Độ chính xác chung).")
@@ -333,19 +339,17 @@ elif menu == "📊 4. Phân tích Dữ liệu (EDA)":
         
         with tab_month:
             st.markdown("**Tỷ lệ chuyển đổi (Conversion Rate) theo Tháng**")
-            # Tính tỷ lệ mua hàng theo từng tháng
             month_conv = df.groupby('Month')['Revenue'].mean() * 100
-            # Sắp xếp lại theo thứ tự tỷ lệ giảm dần
             month_conv = month_conv.sort_values(ascending=False)
             st.bar_chart(month_conv, color="#2e9bf5")
             st.info("💡 **Phân tích:** Tháng 11 (Nov) chứng kiến lượng chốt đơn bùng nổ do hiệu ứng mùa mua sắm cuối năm (Black Friday). Ngược lại, các tháng đầu năm (Feb, Mar) khách vào web chủ yếu để xem (Window Shopping) chứ tỷ lệ chốt đơn rất thấp.")
             
         with tab_metrics:
             st.markdown("**Sự khác biệt rõ rệt về Hành vi giữa Khách mua và Khách vãng lai**")
-            # Tính trung bình các thông số theo Revenue
             mean_metrics = df.groupby('Revenue')[['BounceRates', 'ExitRates', 'PageValues']].mean()
+            
+            # Gán lại index cho đẹp mắt
             mean_metrics.index = ['Không Mua (False)', 'Có Mua (True)']
             
-            # Hiển thị bảng số liệu
             st.dataframe(mean_metrics, use_container_width=True)
             st.success("💡 **Phân tích:** Dễ dàng nhận thấy nhóm Khách Mua Hàng có **PageValues cao gấp hàng chục lần**, đồng thời Tỷ lệ thoát/rời trang (Bounce/Exit Rates) thấp hơn hẳn. Đây chính là các `Top Drivers` (Thuộc tính đóng vai trò quyết định) giúp AI phân loại khách hàng.")
