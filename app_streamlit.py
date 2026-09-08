@@ -245,7 +245,7 @@ elif menu == "🎛️ 2. Tinh chỉnh & Huấn luyện (AutoML)":
                     st.error(f"❌ Quá trình huấn luyện gặp lỗi: {e}")
 
 # ==========================================
-# CHỨC NĂNG 3: DEPLOY GIT SECRETS
+# CHỨC NĂNG 3: DEPLOY GIT SECRETS (BẢN VÁ LỖI NÂNG CAO)
 # ==========================================
 elif menu == "☁️ 3. Đẩy lên Git (Deploy CI/CD)":
     st.title("☁️ Đẩy Mô Hình & Mã Nguồn Lên GitHub")
@@ -258,6 +258,8 @@ elif menu == "☁️ 3. Đẩy lên Git (Deploy CI/CD)":
         st.error(f"❌ Không tìm thấy file `{MODEL_PATH}`. Vui lòng chạy tab Huấn luyện trước.")
     else:
         st.success(f"✅ Đã định vị file `{MODEL_PATH}` sẵn sàng triển khai.")
+        
+        # --- QUẢN LÝ TOKEN ---
         github_token = ""
         if "GITHUB_TOKEN" in st.secrets:
             github_token = st.secrets["GITHUB_TOKEN"]
@@ -266,27 +268,64 @@ elif menu == "☁️ 3. Đẩy lên Git (Deploy CI/CD)":
             st.warning("⚠️ Chưa cấu hình Secrets. Nhập Token tạm thời bên dưới (không ghi vào file):")
             github_token = st.text_input("🔑 GitHub Personal Access Token:", type="password")
 
-        commit_message = st.text_input("📝 Nội dung cập nhật:", "Cập nhật chức năng Phân tích Dữ liệu (EDA) và Tuning")
+        commit_message = st.text_input("📝 Nội dung cập nhật:", "Auto-deploy: Cập nhật hệ thống MLOps")
         
         if st.button("🚀 Bắt Đầu Đẩy Dữ Liệu Lên GitHub", type="primary"):
-            if not github_token: st.error("❌ Thiếu Token xác thực! Tiến trình bị hủy.")
+            if not github_token: 
+                st.error("❌ Thiếu Token xác thực! Tiến trình bị hủy.")
             else:
-                with st.spinner("Đang khởi tạo kết nối an toàn và đẩy dữ liệu..."):
+                with st.spinner("Đang khởi tạo kết nối an toàn và đẩy dữ liệu... (Vui lòng đợi)"):
                     try:
                         remote_url = f"https://{GITHUB_USER}:{github_token}@github.com/{GITHUB_USER}/{REPO_NAME}.git"
+                        
+                        # 1. Thiết lập danh tính
                         subprocess.run(["git", "config", "--global", "user.email", "mlops-bot@system.local"], check=True)
                         subprocess.run(["git", "config", "--global", "user.name", "MLOps Automation Bot"], check=True)
+                        
+                        # 2. Khởi tạo và thiết lập remote (Chặn xuất log thừa)
                         subprocess.run(["git", "init"], check=True, capture_output=True)
-                        subprocess.run(["git", "remote", "remove", "origin"], capture_output=True) 
+                        subprocess.run(["git", "remote", "remove", "origin"], capture_output=True) # Bỏ qua nếu lỗi
                         subprocess.run(["git", "remote", "add", "origin", remote_url], check=True)
+                        
+                        # 3. Gom file để chuẩn bị đẩy
                         subprocess.run(["git", "add", MODEL_PATH, "app_streamlit.py"], check=True)
-                        subprocess.run(["git", "commit", "-m", commit_message], check=True, capture_output=True)
-                        push_result = subprocess.run(["git", "push", "-u", "origin", "main", "--force"], check=True, capture_output=True, text=True)
-                        st.success(f"🎉 Triển khai thành công lên kho `{REPO_NAME}`!")
-                        st.code(push_result.stdout)
+                        
+                        # 4. Kiểm tra xem có gì thay đổi để commit không (Tránh lỗi commit rỗng)
+                        status_check = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+                        if not status_check.stdout.strip():
+                            st.warning("⚠️ Không có sự thay đổi nào ở mã nguồn hoặc mô hình so với bản trên Git. Hệ thống hủy thao tác đẩy.")
+                        else:
+                            subprocess.run(["git", "commit", "-m", commit_message], check=True, capture_output=True)
+                            
+                            # 5. TÌM TÊN NHÁNH (TRÁNH LỖI NHẦM MAIN/MASTER)
+                            branch_process = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True)
+                            current_branch = branch_process.stdout.strip()
+                            if not current_branch:
+                                current_branch = "main" # Nếu máy chưa có nhánh mặc định thì gán là main
+                            
+                            st.info(f"Đang đẩy dữ liệu qua luồng chính: nhánh `{current_branch}`")
+                            
+                            # 6. Đẩy file lên (Force push)
+                            push_result = subprocess.run(
+                                ["git", "push", "-u", "origin", current_branch, "--force"], 
+                                check=True, capture_output=True, text=True
+                            )
+                            
+                            st.success(f"🎉 Triển khai thành công lên kho `{REPO_NAME}`!")
+                            st.code(push_result.stdout)
+                            
                     except subprocess.CalledProcessError as e:
-                        st.error("❌ Lỗi khi thực thi lệnh Git. Vui lòng kiểm tra quyền hạn của Token.")
-                        st.code(e.stderr)
+                        st.error("❌ Xảy ra sự cố khi kết nối với GitHub!")
+                        
+                        # Hiển thị lỗi tiếng Việt để anh dễ khắc phục
+                        error_log = e.stderr if e.stderr else e.stdout
+                        if "Authentication failed" in error_log:
+                            st.error("🔑 Mật khẩu/Token của anh bị sai hoặc đã hết hạn. Hãy tạo Token mới.")
+                        elif "Repository not found" in error_log:
+                            st.error(f"📁 Không tìm thấy kho `{REPO_NAME}` trên tài khoản của anh. Hãy kiểm tra lại tên kho.")
+                        else:
+                            st.write("Chi tiết mã lỗi hệ thống:")
+                            st.code(error_log)
 
 # ==========================================
 # CHỨC NĂNG 4: PHÂN TÍCH DỮ LIỆU (EDA)
