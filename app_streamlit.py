@@ -317,9 +317,15 @@ elif menu == "☁️ 3. Đẩy lên Git (Deploy CI/CD)":
                     except subprocess.CalledProcessError as e:
                         st.error("❌ Xảy ra sự cố khi kết nối với GitHub!")
                         
-                        # Hiển thị lỗi tiếng Việt để anh dễ khắc phục
-                        error_log = e.stderr if e.stderr else e.stdout
-                        if "Authentication failed" in error_log:
+                        # An toàn hóa kiểu dữ liệu: ép chuyển bytes sang string (nếu có)
+                        raw_err = e.stderr if e.stderr else e.stdout
+                        if isinstance(raw_err, bytes):
+                            error_log = raw_err.decode('utf-8', errors='ignore')
+                        else:
+                            error_log = str(raw_err) if raw_err else "Unknown subprocess error"
+                        
+                        # Hiển thị thông báo thân thiện bằng tiếng Việt
+                        if "Authentication failed" in error_log or "Invalid username or token" in error_log:
                             st.error("🔑 Mật khẩu/Token của anh bị sai hoặc đã hết hạn. Hãy tạo Token mới.")
                         elif "Repository not found" in error_log:
                             st.error(f"📁 Không tìm thấy kho `{REPO_NAME}` trên tài khoản của anh. Hãy kiểm tra lại tên kho.")
