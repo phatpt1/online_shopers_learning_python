@@ -52,7 +52,7 @@ menu = st.sidebar.radio(
 # ==========================================
 if menu == "🎯 1. Dự đoán Khách hàng (Inference)":
     st.title("🎯 Dự Báo Ý Định Chốt Đơn (Full Feature Inference)")
-    st.markdown("Phân tích toàn diện **17 thuộc tính hành vi & bối cảnh** từ phiên truy cập người dùng theo chuẩn bộ dữ liệu `online_shoppers.csv`.")
+    st.markdown("Phân tích toàn diện **17 thuộc tính hành vi & bối cảnh** từ phiên truy cập người dùng theo chuẩn bộ dữ liệu `online_shoppers.csv`. Source: https://archive.ics.uci.edu/dataset/468/online+shoppers+purchasing+intention+dataset")
     
     if not os.path.exists(MODEL_PATH):
         st.warning("⚠️ Chưa phát hiện file mô hình `stacking_purchase_model.joblib`. Vui lòng chuyển sang tab 'Tinh chỉnh & Huấn luyện' để khởi tạo mô hình.")
